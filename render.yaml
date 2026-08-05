@@ -2,6 +2,7 @@ services:
   - type: web
     name: arabic-transcriber-mcp
     runtime: docker
+    plan: free
     autoDeploy: true
     healthCheckPath: /mcp-9d229878ae19fd91
     envVars:
