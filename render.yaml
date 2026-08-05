@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: arabic-transcriber-mcp
+    runtime: docker
+    autoDeploy: true
+    healthCheckPath: /mcp-9d229878ae19fd91
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: whisper-large-v3
+      - key: MCP_PATH
+        value: /mcp-9d229878ae19fd91
+      - key: MCP_ALLOWED_HOSTS
+        value: "*"
