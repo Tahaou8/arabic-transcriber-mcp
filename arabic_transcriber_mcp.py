@@ -10,7 +10,7 @@ import socket
 import subprocess
 import tempfile
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 import gdown
 import httpx
@@ -49,10 +49,24 @@ def _is_drive_source(source: str) -> bool:
     )
 
 
-def _drive_url(source: str) -> str:
+def _drive_file_id(source: str) -> str:
+    """Extract a Drive file ID without relying on gdown's removed fuzzy option."""
     if re.fullmatch(r"[A-Za-z0-9_-]{20,}", source):
-        return f"https://drive.google.com/uc?id={source}"
-    return source
+        return source
+
+    parsed = urlparse(source)
+    query_id = parse_qs(parsed.query).get("id", [""])[0]
+    if re.fullmatch(r"[A-Za-z0-9_-]{20,}", query_id):
+        return query_id
+
+    path_match = re.search(r"/(?:file/)?d/([A-Za-z0-9_-]{20,})(?:/|$)", parsed.path)
+    if path_match:
+        return path_match.group(1)
+
+    raise ValueError(
+        "Could not extract a Google Drive file ID. Use a Drive file share link "
+        "or the file ID, and share it as 'Anyone with the link'."
+    )
 
 
 def _validate_public_https_url(source: str) -> str:
@@ -82,16 +96,18 @@ def _download_source(source: str, destination: Path) -> None:
         raise ValueError("source is required")
 
     if _is_drive_source(source):
+        file_id = _drive_file_id(source)
         result = gdown.download(
-            url=_drive_url(source),
+            id=file_id,
             output=str(destination),
             quiet=True,
-            fuzzy=True,
         )
         if not result or not destination.exists() or destination.stat().st_size == 0:
             raise RuntimeError(
                 "Google Drive download failed. Share the file as 'Anyone with the link'."
             )
+        if destination.stat().st_size > MAX_DOWNLOAD_BYTES:
+            raise ValueError("source exceeds the configured download size limit")
         return
 
     url = _validate_public_https_url(source)
